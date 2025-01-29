@@ -2,15 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Books</title>
+    <title>Book | {{ my_book.title }}</title>
 </head>
 <body>
-<h1>Books</h1>
-<ol>
-    {% for book in books %}
-        <li>{{ book.title }}|{{ book.author }}</li>
-    {% endfor %}
-</ol>
-
+<h1>{{ my_book.title }} | {{ my_book.author }}</h1>
+<p>{{ my_book.description }}</p>
 </body>
 </html>
