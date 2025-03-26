@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="container mt-5">
+        <h1>Products ({{ category.name }})</h1>
+        {% if error|length %}
+            <p style="color: red;">{{ error }}</p>
+        {% endif %}
+        <div>
+            {% if user.is_superuser %}
+                <form action="" method="POST" enctype="multipart/form-data" id="form">
+                    {% csrf_token %}
+                    {{ form.errors }}
+                    {% for field in form %}
+                        <div class="mb-3 row">
+                            {#                        {{ field.label_tag }} {{ field }}#}
+                            <label class="col-sm-2 col-form-label-lg"
+                                   for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div class="col-sm-10">
+                                {% if field.widget_type == "select" %}
+                                    <select class="form-select form-select-lg" name="{{ field.name }}"
+                                            id="{{ field.id_for_label }}">
+                                        {% for category in categories %}
+                                            <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% elif field.widget_type == "clearablefile" %}
+                                    <input class="form-control form-control-lg" type="file" accept="image/*"
+                                           name="{{ field.name }}" id="{{ field.id_for_label }}">
+                                {% else %}
+                                    <input class="form-control form-control-lg" type="{{ field.widget_type }}"
+                                           name="{{ field.name }}" id="{{ field.id_for_label }}">
+                                {% endif %}
+                                <div class="text-danger">
+                                    {{ field.errors }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    <button class="btn btn-lg btn-primary" type="submit">Create Product</button>
+                </form>
+            {% endif %}
+        </div>
+        <table class="table fs-4">
+            <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Description</th>
+                <th scope="col">Price</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Category</th>
+                <th scope="col">Action</th>
+            </tr>
+            </thead>
+            <tbody id="table_body">
+            {% comment %}
+                <tr>
+                    <th>{{ product.name }}</th>
+                    <td>{{ product.description }}</td>
+                    <td>{{ product.price }}</td>
+                    <td>{{ product.amount }}</td>
+                    <td>{{ product.category }}</td>
+                    <td>
+                        <a class="btn btn-lg btn-primary"
+                           href="{% url 'product_details' category_id=category.id product_id=product.id %}">Details</a>
+                        {% if user.is_superuser %}
+                            <a class="btn btn-lg btn-dark"
+                               href="{% url 'update_product' category_id=category.id product_id=product.id %}">Update</a>
+                            <a class="btn btn-lg btn-danger"
+                               href="{% url 'delete_product' category_id=category.id product_id=product.id %}">Delete</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endcomment %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}
+
+{% block javascript %}
+    <script type="application/javascript">
+        let form = document.getElementById("form");
+
+        form.onsubmit = async (event) => {
+            event.preventDefault()
+            let url = '{% url 'product_list_api' %}';
+            try {
+                let formData = new FormData();
+                {% for field in form %}
+                    {% if field.widget_type == "clearablefile" %}
+                        formData.append("{{ field.name }}", document.getElementById("{{ field.id_for_label }}").files[0])
+                    {% else %}
+                        formData.append("{{ field.name }}", document.getElementById("{{ field.id_for_label }}").value)
+                    {% endif %}
+                {% endfor %}
+                formData.append('category_id', {{ category.id }});
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    credentials: "same-origin"
+                });
+                if (!response.ok) {
+                    throw new Error(`Response status: ${response.status}`);
+                }
+
+                const json = await response.json();
+                await getProducts();
+                console.log(json);
+            } catch (error) {
+                console.error(error.message);
+            }
+        }
+
+        window.onload = getProducts();
+
+        async function getProducts() {
+            let url = '{% url 'product_list_api' %}';
+            let table_body = document.getElementById("table_body");
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Response status: ${response.status}`);
+                }
+
+                const json = await response.json();
+                table_body.innerHTML = "";
+                for (let el in json) {
+                    table_body.innerHTML += `
+                    <tr>
+                        <th>${json[el].name}</th>
+                        <td>${json[el].description}</td>
+                        <td>${json[el].price}</td>
+                        <td>${json[el].amount}</td>
+                        <td>${json[el].category.name}</td>
+                        <td>
+                            <a class="btn btn-lg btn-primary"
+                               href="/categories/{{ category.id }}/products/${json[el].id}">Details</a>
+                            {% if user.is_superuser %}
+                                <a class="btn btn-lg btn-dark"
+                                   href="/categories/{{ category.id }}/products/${json[el].id}/update">Update</a>
+                                <a class="btn btn-lg btn-danger" onclick="deleteProduct(${json[el].id})"
+                                   href="#">Delete</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    `;
+                }
+                console.log(json);
+            } catch (error) {
+                console.error(error.message);
+            }
+        }
+
+        async function deleteProduct(id) {
+            let url = `/api/products/${id}`;
+            try {
+                const response = await fetch(url, {
+                    method: "DELETE",
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error(`Response status: ${response.status}`);
+                }
+                await getProducts();
+            } catch (error) {
+                console.error(error.message);
+            }
+        }
+    </script>
+{% endblock %}
